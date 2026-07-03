@@ -12,11 +12,15 @@ from app.config import (
     create_provider,
     delete_provider,
     get_providers,
+    get_smtp_settings,
     is_configured,
+    is_smtp_configured,
     patch_provider,
     reorder_providers,
+    save_smtp_settings,
 )
 from app.models import RunStatus, TestRequest, TestRun
+from app.reports.emailer import EmailNotConfiguredError, InvalidRecipientsError, send_report_email
 from app.storage import store
 
 app = FastAPI(title="QA Agent API")
@@ -140,6 +144,55 @@ async def get_test(run_id: str):
     if not run:
         return {"error": "not_found"}
     return run.model_dump()
+
+
+class SmtpPatchPayload(BaseModel):
+    host: str | None = None
+    port: int | None = None
+    encryption: str | None = None
+    username: str | None = None
+    password: str | None = None
+    from_email: str | None = None
+    from_name: str | None = None
+
+
+def _public_smtp(smtp: dict) -> dict:
+    password = smtp.get("password", "")
+    masked = (password[:2] + "…") if password else ""
+    out = {**smtp}
+    out["password"] = masked
+    out["has_password"] = bool(password)
+    return out
+
+
+@app.get("/api/smtp")
+async def get_smtp():
+    return {**_public_smtp(get_smtp_settings()), "configured": is_smtp_configured()}
+
+
+@app.patch("/api/smtp")
+async def update_smtp(payload: SmtpPatchPayload):
+    smtp = save_smtp_settings(payload.model_dump(exclude_unset=True))
+    return {**_public_smtp(smtp), "configured": is_smtp_configured()}
+
+
+class SendEmailPayload(BaseModel):
+    recipients: list[str]
+    message: str | None = None
+
+
+@app.post("/api/tests/{run_id}/send-email")
+async def send_email(run_id: str, payload: SendEmailPayload):
+    run = store.get(run_id)
+    if not run:
+        return {"ok": False, "error": "Teste não encontrado."}
+    try:
+        await asyncio.to_thread(send_report_email, run, payload.recipients, payload.message)
+        return {"ok": True}
+    except (InvalidRecipientsError, EmailNotConfiguredError) as exc:
+        return {"ok": False, "error": str(exc)}
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "error": f"Falha ao enviar e-mail: {exc}"}
 
 
 @app.websocket("/api/tests/{run_id}/stream")

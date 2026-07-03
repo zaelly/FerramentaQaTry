@@ -172,21 +172,120 @@ export function RunPage() {
                     </div>
                   )}
 
-                  {run.report_html_path && (
-                    <a
-                      href={api.reportUrl(run.report_html_path)}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="btn-secondary inline-block mt-6 text-sm"
-                    >
-                      Abrir relatório completo (HTML) ↗
-                    </a>
-                  )}
+                  <div className="flex items-center gap-3 mt-6">
+                    {run.report_html_path && (
+                      <a
+                        href={api.reportUrl(run.report_html_path)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="btn-secondary inline-block text-sm"
+                      >
+                        Abrir relatório completo (HTML) ↗
+                      </a>
+                    )}
+                  </div>
+
+                  <SendEmailSection runId={run.id} />
                 </>
               )}
             </div>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+const MAX_RECIPIENTS = 10;
+
+function parseRecipients(raw: string): string[] {
+  return Array.from(
+    new Set(
+      raw
+        .split(/[,;\n]/)
+        .map((s) => s.trim())
+        .filter(Boolean)
+    )
+  );
+}
+
+function SendEmailSection({ runId }: { runId: string }) {
+  const [open, setOpen] = useState(false);
+  const [recipientsText, setRecipientsText] = useState("");
+  const [message, setMessage] = useState("");
+  const [sending, setSending] = useState(false);
+  const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
+
+  const recipients = parseRecipients(recipientsText);
+  const tooMany = recipients.length > MAX_RECIPIENTS;
+
+  async function handleSend() {
+    setResult(null);
+    if (recipients.length === 0) {
+      setResult({ ok: false, text: "Informe pelo menos um destinatário." });
+      return;
+    }
+    if (tooMany) {
+      setResult({ ok: false, text: `No máximo ${MAX_RECIPIENTS} destinatários por envio.` });
+      return;
+    }
+    setSending(true);
+    try {
+      const res = await api.sendReportEmail(runId, recipients, message || undefined);
+      if (res.ok) {
+        setResult({ ok: true, text: `Relatório enviado para ${recipients.length} destinatário(s).` });
+      } else {
+        setResult({ ok: false, text: res.error || "Falha ao enviar." });
+      }
+    } catch (err: any) {
+      setResult({ ok: false, text: err.message || "Falha ao enviar." });
+    } finally {
+      setSending(false);
+    }
+  }
+
+  if (!open) {
+    return (
+      <button onClick={() => setOpen(true)} className="btn-secondary text-sm mt-3">
+        Enviar por e-mail
+      </button>
+    );
+  }
+
+  return (
+    <div className="card p-5 mt-4">
+      <h4 className="text-white font-semibold mb-1">Enviar relatório por e-mail</h4>
+      <p className="text-xs text-slate-500 mb-3">
+        Até {MAX_RECIPIENTS} destinatários, separados por vírgula ou uma linha por e-mail.
+      </p>
+      <textarea
+        className="input min-h-[70px] resize-y"
+        placeholder="ana@empresa.com, joao@empresa.com..."
+        value={recipientsText}
+        onChange={(e) => setRecipientsText(e.target.value)}
+      />
+      <div className={`text-xs mt-1 ${tooMany ? "text-red-400" : "text-slate-500"}`}>
+        {recipients.length}/{MAX_RECIPIENTS} destinatários
+      </div>
+
+      <textarea
+        className="input min-h-[60px] resize-y mt-3"
+        placeholder="Mensagem opcional para incluir no topo do e-mail..."
+        value={message}
+        onChange={(e) => setMessage(e.target.value)}
+      />
+
+      {result && (
+        <div className={`text-sm mt-3 ${result.ok ? "text-emerald-400" : "text-red-400"}`}>{result.text}</div>
+      )}
+
+      <div className="flex gap-3 mt-4">
+        <button onClick={handleSend} disabled={sending} className="btn-primary text-sm">
+          {sending ? "Enviando..." : "Enviar"}
+        </button>
+        <button onClick={() => setOpen(false)} className="btn-secondary text-sm">
+          Cancelar
+        </button>
       </div>
     </div>
   );
