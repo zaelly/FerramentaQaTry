@@ -1,6 +1,15 @@
 export type RunStatus = "queued" | "running" | "completed" | "failed" | "stopped";
 export type IssueSeverity = "critical" | "major" | "minor" | "suggestion";
-export type IssueCategory = "functional" | "ui_ux" | "performance" | "accessibility";
+export type IssueCategory = "functional" | "ui_ux" | "performance" | "accessibility" | "seo" | "security";
+
+export interface PerformanceMetrics {
+  loadTime?: number | null;
+  domContentLoaded?: number | null;
+  ttfb?: number | null;
+  fcp?: number | null;
+  resourceCount?: number;
+  transferSize?: number;
+}
 
 export interface Step {
   index: number;
@@ -52,6 +61,8 @@ export interface Summary {
   score?: number | null;
   functional_suggestions: string[];
   ui_ux_suggestions: string[];
+  seo_suggestions: string[];
+  security_suggestions: string[];
 }
 
 export interface TestRun {
@@ -66,6 +77,7 @@ export interface TestRun {
   steps: Step[];
   issues: Issue[];
   summary: Summary;
+  performance_metrics: Record<string, PerformanceMetrics>;
   error?: string | null;
   report_html_path?: string | null;
 }

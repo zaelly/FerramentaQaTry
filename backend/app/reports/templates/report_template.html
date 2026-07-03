@@ -62,7 +62,33 @@
         {% if not run.summary.ui_ux_suggestions %}<li class="muted">Nenhuma sugestão registrada.</li>{% endif %}
       </ul>
     </div>
+    <div class="card">
+      <h3>Sugestões de SEO</h3>
+      <ul>
+        {% for s in run.summary.seo_suggestions %}<li>{{ s }}</li>{% endfor %}
+        {% if not run.summary.seo_suggestions %}<li class="muted">Nenhuma sugestão registrada.</li>{% endif %}
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Sugestões de segurança</h3>
+      <ul>
+        {% for s in run.summary.security_suggestions %}<li>{{ s }}</li>{% endfor %}
+        {% if not run.summary.security_suggestions %}<li class="muted">Nenhuma sugestão registrada.</li>{% endif %}
+      </ul>
+    </div>
   </div>
+
+  {% if run.performance_metrics %}
+  <div class="card">
+    <h3>Performance de carregamento</h3>
+    {% for url, m in run.performance_metrics.items() %}
+    <div class="step-line">
+      {{ url }} — carregamento: {{ "%.1f"|format(m.loadTime / 1000) if m.loadTime else 'n/d' }}s,
+      requisições: {{ m.resourceCount }}, transferido: {{ "%.1f"|format((m.transferSize or 0) / 1048576) }}MB
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
 
   <div class="card">
     <h3>Problemas encontrados ({{ run.issues|length }})</h3>

@@ -5,6 +5,7 @@ import traceback
 from playwright.async_api import async_playwright
 
 from app.agent.actions import execute_action
+from app.agent.audits import run_page_audits
 from app.agent.dom_extract import (
     draw_marks_on_screenshot,
     elements_to_text,
@@ -87,6 +88,28 @@ def _save_screenshot(run_id: str, index: int, image_bytes: bytes) -> str:
 
 async def _publish(run: TestRun, event: dict) -> None:
     await store.publish(run.id, event)
+
+
+async def _maybe_audit_page(page, run: TestRun, audited_urls: set) -> None:
+    """Runs the SEO/accessibility/performance/security audits the first time
+    the agent lands on a given URL. Cheap no-op on repeat visits."""
+    url = page.url
+    if url in audited_urls:
+        return
+    audited_urls.add(url)
+
+    try:
+        issues, metrics = await run_page_audits(page)
+    except Exception:
+        return
+
+    if metrics:
+        run.performance_metrics[url] = metrics
+    for issue in issues:
+        run.issues.append(issue)
+        await _publish(run, {"type": "issue", "issue": issue.model_dump()})
+    if issues or metrics:
+        store.update(run)
 
 
 def _history_text(steps: list[Step]) -> str:
@@ -178,9 +201,13 @@ async def run_test(run: TestRun, username: str | None, password: str | None) -> 
             await page.goto(run.url, wait_until="domcontentloaded", timeout=30000)
             await page.wait_for_timeout(800)
 
+            audited_urls: set = set()
+            await _maybe_audit_page(page, run, audited_urls)
+
             step_index = 0
             consecutive_decision_errors = 0
             while step_index < run.max_steps:
+                await _maybe_audit_page(page, run, audited_urls)
                 elements = await extract_interactive_elements(page)
                 raw_screenshot = await page.screenshot(full_page=False)
                 marked_screenshot = draw_marks_on_screenshot(raw_screenshot, elements)
@@ -296,18 +323,38 @@ async def run_test(run: TestRun, username: str | None, password: str | None) -> 
     await _publish(run, {"type": "finished", "status": run.status})
 
 
+def _performance_text(performance_metrics: dict) -> str:
+    lines = []
+    for url, metrics in performance_metrics.items():
+        load_time = metrics.get("loadTime")
+        load_s = f"{load_time / 1000:.1f}s" if load_time else "n/d"
+        lines.append(
+            f"- {url}: carregamento={load_s}, requisições={metrics.get('resourceCount', 'n/d')}, "
+            f"transferido={(metrics.get('transferSize', 0) or 0) / (1024*1024):.1f}MB"
+        )
+    return "\n".join(lines)
+
+
 async def _build_final_report(run: TestRun) -> None:
     try:
         report_data, _provider = await asyncio.to_thread(
             ask_text,
             REPORT_SYSTEM_PROMPT,
-            build_report_user_context(run.url, run.goal, _steps_text(run.steps), _issues_text(run.issues)),
+            build_report_user_context(
+                run.url,
+                run.goal,
+                _steps_text(run.steps),
+                _issues_text(run.issues),
+                _performance_text(run.performance_metrics),
+            ),
         )
         run.summary = Summary(
             overall_assessment=report_data.get("overall_assessment", ""),
             score=report_data.get("score"),
             functional_suggestions=report_data.get("functional_suggestions", []),
             ui_ux_suggestions=report_data.get("ui_ux_suggestions", []),
+            seo_suggestions=report_data.get("seo_suggestions", []),
+            security_suggestions=report_data.get("security_suggestions", []),
         )
     except Exception as exc:  # noqa: BLE001
         run.summary = Summary(overall_assessment=f"Não foi possível gerar o resumo automático: {exc}")

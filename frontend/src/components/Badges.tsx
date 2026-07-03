@@ -27,6 +27,8 @@ const categoryLabel: Record<IssueCategory, string> = {
   ui_ux: "UI/UX",
   performance: "Performance",
   accessibility: "Acessibilidade",
+  seo: "SEO",
+  security: "Segurança",
 };
 
 export function CategoryBadge({ category }: { category: IssueCategory }) {

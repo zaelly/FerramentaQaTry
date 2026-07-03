@@ -146,25 +146,31 @@ export function RunPage() {
                   <p className="text-sm text-slate-300 mb-5">{run.summary.overall_assessment}</p>
 
                   <div className="grid grid-cols-2 gap-6">
-                    <div>
-                      <h4 className="text-sm font-semibold text-slate-200 mb-2">Sugestões funcionais</h4>
-                      <ul className="space-y-1.5 text-sm text-slate-400 list-disc list-inside">
-                        {run.summary.functional_suggestions.map((s, i) => (
-                          <li key={i}>{s}</li>
-                        ))}
-                        {run.summary.functional_suggestions.length === 0 && <li>Nenhuma sugestão.</li>}
-                      </ul>
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-semibold text-slate-200 mb-2">Sugestões de UI/UX</h4>
-                      <ul className="space-y-1.5 text-sm text-slate-400 list-disc list-inside">
-                        {run.summary.ui_ux_suggestions.map((s, i) => (
-                          <li key={i}>{s}</li>
-                        ))}
-                        {run.summary.ui_ux_suggestions.length === 0 && <li>Nenhuma sugestão.</li>}
-                      </ul>
-                    </div>
+                    <SuggestionList title="Sugestões funcionais" items={run.summary.functional_suggestions} />
+                    <SuggestionList title="Sugestões de UI/UX" items={run.summary.ui_ux_suggestions} />
+                    <SuggestionList title="Sugestões de SEO" items={run.summary.seo_suggestions} />
+                    <SuggestionList title="Sugestões de segurança" items={run.summary.security_suggestions} />
                   </div>
+
+                  {Object.keys(run.performance_metrics).length > 0 && (
+                    <div className="mt-6">
+                      <h4 className="text-sm font-semibold text-slate-200 mb-2">Performance de carregamento</h4>
+                      <div className="space-y-1.5">
+                        {Object.entries(run.performance_metrics).map(([url, m]) => (
+                          <div key={url} className="text-xs text-slate-400 flex gap-4">
+                            <span className="truncate max-w-xs" title={url}>
+                              {url}
+                            </span>
+                            <span>
+                              {m.loadTime != null ? `${(m.loadTime / 1000).toFixed(1)}s` : "n/d"}
+                            </span>
+                            <span>{m.resourceCount ?? "n/d"} requisições</span>
+                            <span>{((m.transferSize ?? 0) / (1024 * 1024)).toFixed(1)}MB</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {run.report_html_path && (
                     <a
@@ -182,6 +188,20 @@ export function RunPage() {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function SuggestionList({ title, items }: { title: string; items: string[] }) {
+  return (
+    <div>
+      <h4 className="text-sm font-semibold text-slate-200 mb-2">{title}</h4>
+      <ul className="space-y-1.5 text-sm text-slate-400 list-disc list-inside">
+        {items.map((s, i) => (
+          <li key={i}>{s}</li>
+        ))}
+        {items.length === 0 && <li>Nenhuma sugestão.</li>}
+      </ul>
     </div>
   );
 }

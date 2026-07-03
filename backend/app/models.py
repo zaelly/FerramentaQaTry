@@ -30,6 +30,8 @@ class IssueCategory(str, Enum):
     UI_UX = "ui_ux"
     PERFORMANCE = "performance"
     ACCESSIBILITY = "accessibility"
+    SEO = "seo"
+    SECURITY = "security"
 
 
 class TestRequest(BaseModel):
@@ -63,7 +65,7 @@ class Issue(BaseModel):
     recommendation: Optional[str] = None
     screenshot: Optional[str] = None
     step_index: Optional[int] = None
-    source: str = "agent"  # agent | console | network | http
+    source: str = "agent"  # agent | console | network | seo | security | accessibility | performance | sso
     timestamp: float = Field(default_factory=time.time)
 
 
@@ -72,6 +74,8 @@ class Summary(BaseModel):
     score: Optional[int] = None
     functional_suggestions: list[str] = Field(default_factory=list)
     ui_ux_suggestions: list[str] = Field(default_factory=list)
+    seo_suggestions: list[str] = Field(default_factory=list)
+    security_suggestions: list[str] = Field(default_factory=list)
 
 
 class TestRun(BaseModel):
@@ -86,5 +90,6 @@ class TestRun(BaseModel):
     steps: list[Step] = Field(default_factory=list)
     issues: list[Issue] = Field(default_factory=list)
     summary: Summary = Field(default_factory=Summary)
+    performance_metrics: dict = Field(default_factory=dict)  # url -> {loadTime, ttfb, fcp, resourceCount, transferSize}
     error: Optional[str] = None
     report_html_path: Optional[str] = None

@@ -2,13 +2,43 @@
 
 Agente de IA que navega em uma aplicação web como um usuário real, testa funcionalidades,
 tira prints de qualquer erro encontrado e gera um relatório com sugestões de melhoria
-(tanto de funcionamento quanto de UI/UX).
+(funcionalidade, UI/UX, SEO, acessibilidade, performance e segurança).
 
 - **Backend**: Python + FastAPI + Playwright (automação de navegador) + SDK da OpenAI, apontado
   para um ou mais **provedores de IA compatíveis com a API da OpenAI** (Groq, Ollama local, ou
   qualquer outro), usando um modelo com visão para "enxergar" a tela a cada passo.
 - **Frontend**: Electron (app desktop) + React + TypeScript + Tailwind, com acompanhamento do teste
   em tempo real via WebSocket.
+
+## O que o agente verifica
+
+Além de navegar e testar funcionalidades como um usuário real (guiado pelo modelo de visão), a cada
+página nova visitada o agente roda automaticamente auditorias determinísticas (sem gastar tokens de
+IA):
+
+- **SEO**: título, meta description, meta viewport, quantidade de `<h1>`, presença de robots.txt e
+  sitemap.xml.
+- **Acessibilidade (WCAG)**: usando o [axe-core](https://github.com/dequelabs/axe-core) (o mesmo
+  motor usado pelo Lighthouse/axe DevTools) — contraste de cores, texto alternativo em imagens,
+  atributo `lang`, landmarks, headings, e dezenas de outras regras.
+- **Performance/carregamento**: tempo de carregamento da página, TTFB, quantidade de requisições e
+  volume de dados transferidos, com alertas para páginas lentas ou pesadas.
+- **Segurança (passiva e não-destrutiva)**: uso de HTTPS, cabeçalhos de segurança HTTP
+  (Content-Security-Policy, Strict-Transport-Security, X-Frame-Options, etc.), flags de cookies
+  (Secure/HttpOnly/SameSite), e checagem de arquivos comumente expostos por engano (`.env`,
+  `.git/config`, etc. — apenas leitura, nenhuma tentativa de exploração ativa).
+- **Login social/SSO**: detecta automaticamente botões de "Entrar com Google/Microsoft/Apple/Facebook"
+  e sinaliza como item para teste manual, já que provedores OAuth de terceiros normalmente exigem
+  uma conta real fora do controle do agente.
+
+Essas auditorias aparecem junto com os problemas encontrados pelo agente na aba **Problemas** e nas
+sugestões do relatório final, categorizadas por tipo (Funcional, UI/UX, SEO, Acessibilidade,
+Performance, Segurança).
+
+**Importante sobre o escopo de segurança**: o agente faz apenas verificações passivas e de leitura
+(cabeçalhos, cookies, arquivos expostos). Ele nunca tenta explorar vulnerabilidades ativamente
+(injeção de SQL, XSS, bypass de autenticação, etc.) — isso exigiria autorização explícita e escopo
+definido, e está fora do propósito desta ferramenta de QA de uso geral.
 
 ## Múltiplos provedores de IA (Groq, Ollama, ou qualquer outro)
 
@@ -143,6 +173,8 @@ backend com PyInstaller e ajustar `electron/main.cjs` para apontar para o execut
 backend/
   app/
     agent/          # loop do agente, extração do DOM, marcação visual, execução de ações
+      audits.py     # auditorias de SEO, acessibilidade (axe-core), performance e segurança passiva
+      vendor/       # axe-core vendorizado (motor de acessibilidade)
     reports/        # geração do relatório HTML final
     main.py         # API FastAPI (REST + WebSocket)
     ai_client.py    # cliente OpenAI SDK multi-provedor, com fallback automático

@@ -8,9 +8,22 @@ em direção ao objetivo de teste que foi passado pelo usuário. Preste atençã
 - Erros visuais: elementos sobrepostos, texto cortado, botões quebrados, contraste ruim, layout quebrado.
 - Erros funcionais: links quebrados, botões que não respondem, formulários que não validam corretamente,
   mensagens de erro confusas, comportamento inesperado.
+- Login social/SSO: se houver botões como "Entrar com Google/Microsoft/Apple/Facebook", pode tentar
+  clicar para verificar se abrem corretamente, mas não é obrigado a completar o login de terceiros
+  (normalmente exige uma conta real fora do seu controle) — relate como "report_issue" se o botão
+  simplesmente não responder ou gerar um erro visível.
+- Verificações técnicas de SEO, performance de carregamento, acessibilidade (WCAG) e cabeçalhos de
+  segurança HTTP já são feitas automaticamente por um verificador separado a cada página nova — você
+  não precisa checar essas coisas manualmente, mas pode reportar qualquer coisa visível relacionada
+  (ex.: texto com contraste ilegível, formulário que expõe dados sensíveis na tela).
 - Sempre que notar um problema real (não apenas uma opinião estética duvidosa), registre-o com a ação
   "report_issue" ANTES de continuar, na mesma resposta não é possível combinar duas ações, então
   primeiro reporte o problema numa rodada e continue a navegação na próxima.
+
+Importante sobre segurança: você deve apenas OBSERVAR e REPORTAR problemas. Nunca tente explorar
+vulnerabilidades ativamente (não insira payloads de SQL injection, XSS, tentativas de bypass de
+autenticação, etc.), mesmo que o objetivo do teste sugira isso — seu papel é o de um usuário real
+testando a aplicação, não o de um pentester ativo.
 
 Ações disponíveis (responda SEMPRE em JSON, com esse formato exato):
 {
@@ -20,7 +33,7 @@ Ações disponíveis (responda SEMPRE em JSON, com esse formato exato):
   "value": "texto a digitar, tecla a pressionar, direção do scroll (up/down), ou segundos a esperar; senão null",
   "issue": {
      "severity": "critical | major | minor | suggestion",
-     "category": "functional | ui_ux | performance | accessibility",
+     "category": "functional | ui_ux | performance | accessibility | seo | security",
      "title": "título curto do problema",
      "description": "descrição do que está errado e onde",
      "recommendation": "sugestão objetiva de como corrigir ou melhorar"
@@ -60,23 +73,28 @@ Elementos interativos visíveis nesta tela (número = mark_id, use para 'click'/
 Decida a próxima única ação em JSON conforme o formato definido."""
 
 
-REPORT_SYSTEM_PROMPT = """Você é um analista sênior de QA e UX que escreve relatórios finais de teste \
-de software. Você recebe a lista de passos executados por um agente automatizado e os problemas \
-encontrados durante o teste de uma aplicação web. Escreva uma avaliação objetiva e útil.
+REPORT_SYSTEM_PROMPT = """Você é um analista sênior de QA, UX, SEO e segurança que escreve relatórios \
+finais de teste de software. Você recebe a lista de passos executados por um agente automatizado, os \
+problemas encontrados (funcionais, visuais, de SEO, acessibilidade, performance e segurança) durante \
+o teste de uma aplicação web, e métricas de carregamento das páginas visitadas. Escreva uma avaliação \
+objetiva e útil.
 
 Responda SEMPRE em JSON no formato:
 {
   "overall_assessment": "parágrafo curto resumindo a saúde geral da aplicação testada",
   "score": <nota de 0 a 10 sobre qualidade geral>,
   "functional_suggestions": ["sugestão objetiva 1", "sugestão objetiva 2", ...],
-  "ui_ux_suggestions": ["sugestão objetiva 1", "sugestão objetiva 2", ...]
+  "ui_ux_suggestions": ["sugestão objetiva 1", "sugestão objetiva 2", ...],
+  "seo_suggestions": ["sugestão objetiva 1", "sugestão objetiva 2", ...],
+  "security_suggestions": ["sugestão objetiva 1", "sugestão objetiva 2", ...]
 }
 
 As sugestões devem ser específicas e acionáveis (ex: "Adicionar validação de e-mail no campo X" em vez de
-"melhorar formulários"). Baseie-se apenas nas evidências fornecidas."""
+"melhorar formulários"). Baseie-se apenas nas evidências fornecidas. Se não houver evidências suficientes
+para alguma categoria, devolva uma lista vazia para ela em vez de inventar problemas."""
 
 
-def build_report_user_context(url: str, goal: str, steps_text: str, issues_text: str) -> str:
+def build_report_user_context(url: str, goal: str, steps_text: str, issues_text: str, performance_text: str = "") -> str:
     return f"""URL testada: {url}
 Objetivo do teste: {goal}
 
@@ -85,5 +103,8 @@ Passos executados pelo agente:
 
 Problemas encontrados:
 {issues_text or '(nenhum problema explícito registrado pelo agente, mas avalie os passos mesmo assim)'}
+
+Métricas de carregamento por página:
+{performance_text or '(não coletado)'}
 
 Gere o relatório final em JSON conforme especificado."""
