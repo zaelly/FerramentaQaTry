@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+<meta charset="utf-8" />
+<title>Relatório de QA — {{ run.url }}</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; background: #0b0e14; color: #e7e9ee; margin: 0; padding: 40px; }
+  .container { max-width: 960px; margin: 0 auto; }
+  h1 { font-size: 22px; margin-bottom: 4px; }
+  .muted { color: #9aa4b2; font-size: 13px; }
+  .card { background: #131722; border: 1px solid #232838; border-radius: 12px; padding: 20px 24px; margin: 18px 0; }
+  .score { font-size: 40px; font-weight: 700; }
+  .score.good { color: #4ade80; } .score.mid { color: #fbbf24; } .score.bad { color: #f87171; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  ul { padding-left: 18px; margin: 8px 0; }
+  li { margin: 4px 0; }
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; text-transform: uppercase; }
+  .badge.critical { background: #7f1d1d; color: #fca5a5; }
+  .badge.major { background: #7c2d12; color: #fdba74; }
+  .badge.minor { background: #713f12; color: #fde68a; }
+  .badge.suggestion { background: #1e3a5f; color: #93c5fd; }
+  .issue { border-left: 3px solid #334; padding-left: 16px; margin-bottom: 22px; }
+  .issue img { max-width: 100%; border-radius: 8px; border: 1px solid #232838; margin-top: 10px; }
+  .step-line { font-family: ui-monospace, Consolas, monospace; font-size: 12.5px; color: #b7c0cf; padding: 3px 0; border-bottom: 1px dashed #232838; }
+  .step-line.err { color: #f87171; }
+  a { color: #7dd3fc; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Relatório de Teste de QA</h1>
+  <div class="muted">URL: {{ run.url }} — Objetivo: {{ run.goal }}</div>
+  <div class="muted">Executado em {{ started_at_str }} · Status: {{ run.status }}</div>
+
+  <div class="card">
+    <div class="grid">
+      <div>
+        <div class="muted">Nota geral</div>
+        <div class="score {{ score_class }}">{{ run.summary.score if run.summary.score is not none else '-' }}/10</div>
+      </div>
+      <div>
+        <div class="muted">Resumo</div>
+        <div>{{ run.summary.overall_assessment }}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h3>Sugestões de funcionalidade</h3>
+      <ul>
+        {% for s in run.summary.functional_suggestions %}<li>{{ s }}</li>{% endfor %}
+        {% if not run.summary.functional_suggestions %}<li class="muted">Nenhuma sugestão registrada.</li>{% endif %}
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Sugestões de UI/UX</h3>
+      <ul>
+        {% for s in run.summary.ui_ux_suggestions %}<li>{{ s }}</li>{% endfor %}
+        {% if not run.summary.ui_ux_suggestions %}<li class="muted">Nenhuma sugestão registrada.</li>{% endif %}
+      </ul>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Problemas encontrados ({{ run.issues|length }})</h3>
+    {% for issue in run.issues %}
+    <div class="issue">
+      <span class="badge {{ issue.severity }}">{{ issue.severity }}</span>
+      <span class="badge {{ issue.category }}" style="background:#1f2937;color:#cbd5e1;">{{ issue.category }}</span>
+      <h4 style="margin:8px 0 2px;">{{ issue.title }}</h4>
+      <div>{{ issue.description }}</div>
+      {% if issue.recommendation %}<div class="muted" style="margin-top:6px;"><strong>Recomendação:</strong> {{ issue.recommendation }}</div>{% endif %}
+      {% if issue.screenshot %}<img src="../screenshots/{{ issue.screenshot }}" alt="evidência" />{% endif %}
+    </div>
+    {% else %}
+    <div class="muted">Nenhum problema explícito foi registrado durante o teste.</div>
+    {% endfor %}
+  </div>
+
+  <div class="card">
+    <h3>Linha do tempo de passos ({{ run.steps|length }})</h3>
+    {% for step in run.steps %}
+    <div class="step-line {{ '' if step.ok else 'err' }}">
+      #{{ step.index }} [{{ step.action }}]{% if step.target %} alvo={{ step.target }}{% endif %}{% if step.value %} valor="{{ step.value }}"{% endif %}
+      {% if step.thought %} — {{ step.thought }}{% endif %}
+      {% if not step.ok %} (ERRO: {{ step.error }}){% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+</body>
+</html>
