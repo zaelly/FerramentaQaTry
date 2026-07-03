@@ -25,6 +25,10 @@
   .issue img { max-width: 100%; border-radius: 8px; border: 1px solid #232838; margin-top: 10px; }
   .step-line { font-family: ui-monospace, Consolas, monospace; font-size: 12.5px; color: #b7c0cf; padding: 3px 0; border-bottom: 1px dashed #232838; }
   .step-line.err { color: #f87171; }
+  .path-summary { font-family: ui-monospace, Consolas, monospace; font-size: 12px; color: #9aa4b2; background: #0d1017; border-radius: 8px; padding: 10px 12px; margin-top: 8px; white-space: pre-line; }
+  .issue-url { font-size: 12px; margin-top: 4px; }
+  .suggestion { margin-bottom: 14px; }
+  .suggestion img { max-width: 320px; border-radius: 6px; border: 1px solid #232838; margin-top: 6px; display: block; }
   a { color: #7dd3fc; }
 </style>
 </head>
@@ -32,7 +36,7 @@
 <div class="container">
   <h1>Relatório de Teste de QA</h1>
   <div class="muted">URL: {{ run.url }} — Objetivo: {{ run.goal }}</div>
-  <div class="muted">Executado em {{ started_at_str }} · Status: {{ run.status }}</div>
+  <div class="muted">Executado em {{ started_at_str }} · Status: {{ status_label }}</div>
 
   <div class="card">
     <div class="grid">
@@ -47,35 +51,26 @@
     </div>
   </div>
 
+  {% macro suggestion_list(title, items) %}
+  <div class="card">
+    <h3>{{ title }}</h3>
+    {% for s in items %}
+    <div class="suggestion">
+      <div>{{ s.text }}</div>
+      {% if s.url %}<div class="muted">URL: <a href="{{ s.url }}">{{ s.url }}</a></div>{% endif %}
+      {% if s.screenshot %}<img src="../screenshots/{{ s.screenshot }}" alt="onde aplicar a sugestão" />{% endif %}
+    </div>
+    {% else %}
+    <div class="muted">Nenhuma sugestão registrada.</div>
+    {% endfor %}
+  </div>
+  {% endmacro %}
+
   <div class="grid">
-    <div class="card">
-      <h3>Sugestões de funcionalidade</h3>
-      <ul>
-        {% for s in run.summary.functional_suggestions %}<li>{{ s }}</li>{% endfor %}
-        {% if not run.summary.functional_suggestions %}<li class="muted">Nenhuma sugestão registrada.</li>{% endif %}
-      </ul>
-    </div>
-    <div class="card">
-      <h3>Sugestões de UI/UX</h3>
-      <ul>
-        {% for s in run.summary.ui_ux_suggestions %}<li>{{ s }}</li>{% endfor %}
-        {% if not run.summary.ui_ux_suggestions %}<li class="muted">Nenhuma sugestão registrada.</li>{% endif %}
-      </ul>
-    </div>
-    <div class="card">
-      <h3>Sugestões de SEO</h3>
-      <ul>
-        {% for s in run.summary.seo_suggestions %}<li>{{ s }}</li>{% endfor %}
-        {% if not run.summary.seo_suggestions %}<li class="muted">Nenhuma sugestão registrada.</li>{% endif %}
-      </ul>
-    </div>
-    <div class="card">
-      <h3>Sugestões de segurança</h3>
-      <ul>
-        {% for s in run.summary.security_suggestions %}<li>{{ s }}</li>{% endfor %}
-        {% if not run.summary.security_suggestions %}<li class="muted">Nenhuma sugestão registrada.</li>{% endif %}
-      </ul>
-    </div>
+    {{ suggestion_list("Sugestões de funcionalidade", run.summary.functional_suggestions) }}
+    {{ suggestion_list("Sugestões de UI/UX", run.summary.ui_ux_suggestions) }}
+    {{ suggestion_list("Sugestões de SEO", run.summary.seo_suggestions) }}
+    {{ suggestion_list("Sugestões de segurança", run.summary.security_suggestions) }}
   </div>
 
   {% if run.performance_metrics %}
@@ -97,8 +92,10 @@
       <span class="badge {{ issue.severity }}">{{ issue.severity }}</span>
       <span class="badge {{ issue.category }}" style="background:#1f2937;color:#cbd5e1;">{{ issue.category }}</span>
       <h4 style="margin:8px 0 2px;">{{ issue.title }}</h4>
-      <div>{{ issue.description }}</div>
+      {% if issue.url %}<div class="issue-url muted">URL: <a href="{{ issue.url }}">{{ issue.url }}</a></div>{% endif %}
+      <div style="margin-top:6px;">{{ issue.description }}</div>
       {% if issue.recommendation %}<div class="muted" style="margin-top:6px;"><strong>Recomendação:</strong> {{ issue.recommendation }}</div>{% endif %}
+      {% if issue.path_summary %}<div class="path-summary">{{ issue.path_summary }}</div>{% endif %}
       {% if issue.screenshot %}<img src="../screenshots/{{ issue.screenshot }}" alt="evidência" />{% endif %}
     </div>
     {% else %}

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { CategoryBadge, SeverityBadge, StatusBadge } from "../components/Badges";
 import { api } from "../lib/api";
-import type { Issue, RunStatus, Step, TestRun } from "../lib/types";
+import type { Issue, RunStatus, Step, SuggestionItem, TestRun } from "../lib/types";
 
 export function RunPage() {
   const { id } = useParams<{ id: string }>();
@@ -291,16 +291,30 @@ function SendEmailSection({ runId }: { runId: string }) {
   );
 }
 
-function SuggestionList({ title, items }: { title: string; items: string[] }) {
+function SuggestionList({ title, items }: { title: string; items: SuggestionItem[] }) {
   return (
     <div>
       <h4 className="text-sm font-semibold text-slate-200 mb-2">{title}</h4>
-      <ul className="space-y-1.5 text-sm text-slate-400 list-disc list-inside">
+      {items.length === 0 && <div className="text-sm text-slate-500">Nenhuma sugestão.</div>}
+      <div className="space-y-3">
         {items.map((s, i) => (
-          <li key={i}>{s}</li>
+          <div key={i} className="text-sm text-slate-400 border-l-2 border-base-700 pl-3">
+            <div>{s.text}</div>
+            {s.url && (
+              <div className="text-xs text-slate-500 mt-1 truncate" title={s.url}>
+                URL: {s.url}
+              </div>
+            )}
+            {s.screenshot && (
+              <img
+                src={api.screenshotUrl(s.screenshot)}
+                className="mt-2 rounded-lg border border-base-700 max-w-xs"
+                alt="onde aplicar a sugestão"
+              />
+            )}
+          </div>
         ))}
-        {items.length === 0 && <li>Nenhuma sugestão.</li>}
-      </ul>
+      </div>
     </div>
   );
 }
@@ -348,12 +362,22 @@ function IssueCard({ issue }: { issue: Issue }) {
         <CategoryBadge category={issue.category} />
       </div>
       <h4 className="text-white font-medium">{issue.title}</h4>
-      <p className="text-sm text-slate-400 mt-1">{issue.description}</p>
+      {issue.url && (
+        <div className="text-xs text-slate-500 mt-1 truncate" title={issue.url}>
+          URL: {issue.url}
+        </div>
+      )}
+      <p className="text-sm text-slate-400 mt-2">{issue.description}</p>
       {issue.recommendation && (
         <p className="text-sm text-emerald-400/90 mt-2">
           <span className="font-medium">Sugestão: </span>
           {issue.recommendation}
         </p>
+      )}
+      {issue.path_summary && (
+        <pre className="text-xs text-slate-500 mt-3 bg-base-900 border border-base-700 rounded-lg p-3 whitespace-pre-wrap font-mono">
+          {issue.path_summary}
+        </pre>
       )}
       {issue.screenshot && (
         <img

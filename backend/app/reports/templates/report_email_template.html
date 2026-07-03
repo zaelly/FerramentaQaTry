@@ -12,7 +12,7 @@
 
   <h1 style="font-size:20px;color:#111827;margin:0 0 4px;">Relatório de Teste de QA</h1>
   <div style="color:#6b7280;font-size:13px;margin-bottom:4px;">URL: {{ run.url }} — Objetivo: {{ run.goal }}</div>
-  <div style="color:#6b7280;font-size:13px;margin-bottom:18px;">Executado em {{ started_at_str }} · Status: {{ run.status }}</div>
+  <div style="color:#6b7280;font-size:13px;margin-bottom:18px;">Executado em {{ started_at_str }} · Status: {{ status_label }}</div>
 
   <table role="presentation" width="100%" style="border-collapse:collapse;background:#ffffff;border:1px solid #e5e7eb;border-radius:10px;margin-bottom:16px;">
     <tr>
@@ -32,9 +32,15 @@
     <tr><td style="padding:16px 18px;">
       <div style="font-weight:600;color:#111827;font-size:14px;margin-bottom:6px;">{{ title }}</div>
       {% if items %}
-        <ul style="margin:0;padding-left:18px;color:#374151;font-size:13px;">
-          {% for s in items %}<li style="margin:3px 0;">{{ s }}</li>{% endfor %}
-        </ul>
+        {% for s in items %}
+        <div style="margin:8px 0;padding-bottom:8px;{% if not loop.last %}border-bottom:1px solid #f3f4f6;{% endif %}">
+          <div style="color:#374151;font-size:13px;">{{ s.text }}</div>
+          {% if s.url %}<div style="color:#6b7280;font-size:11px;margin-top:2px;">URL: {{ s.url }}</div>{% endif %}
+          {% if s.screenshot and s.screenshot in screenshot_cids %}
+          <img src="cid:{{ screenshot_cids[s.screenshot] }}" alt="onde aplicar a sugestão" style="max-width:100%;border-radius:6px;border:1px solid #e5e7eb;margin-top:6px;" />
+          {% endif %}
+        </div>
+        {% endfor %}
       {% else %}
         <div style="color:#9ca3af;font-size:13px;">Nenhuma sugestão registrada.</div>
       {% endif %}
@@ -50,8 +56,10 @@
         <span style="display:inline-block;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;text-transform:uppercase;background:#fee2e2;color:#991b1b;">{{ issue.severity }}</span>
         <span style="display:inline-block;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;text-transform:uppercase;background:#e5e7eb;color:#374151;">{{ issue.category }}</span>
         <div style="font-weight:600;color:#111827;font-size:13px;margin:6px 0 2px;">{{ issue.title }}</div>
-        <div style="color:#374151;font-size:13px;">{{ issue.description }}</div>
+        {% if issue.url %}<div style="color:#6b7280;font-size:11px;">URL: {{ issue.url }}</div>{% endif %}
+        <div style="color:#374151;font-size:13px;margin-top:4px;">{{ issue.description }}</div>
         {% if issue.recommendation %}<div style="color:#6b7280;font-size:12px;margin-top:4px;"><strong>Recomendação:</strong> {{ issue.recommendation }}</div>{% endif %}
+        {% if issue.path_summary %}<div style="color:#6b7280;font-size:11px;margin-top:6px;background:#f9fafb;border-radius:6px;padding:8px 10px;white-space:pre-line;font-family:ui-monospace,Consolas,monospace;">{{ issue.path_summary }}</div>{% endif %}
         {% if issue.screenshot and issue.screenshot in screenshot_cids %}
         <img src="cid:{{ screenshot_cids[issue.screenshot] }}" alt="evidência" style="max-width:100%;border-radius:6px;border:1px solid #e5e7eb;margin-top:8px;" />
         {% endif %}

@@ -54,15 +54,24 @@ export interface Issue {
   step_index?: number | null;
   source: string;
   timestamp: number;
+  url?: string | null;
+  path_summary?: string | null;
+}
+
+export interface SuggestionItem {
+  text: string;
+  url?: string | null;
+  screenshot?: string | null;
+  severity?: IssueSeverity | null;
 }
 
 export interface Summary {
   overall_assessment: string;
   score?: number | null;
-  functional_suggestions: string[];
-  ui_ux_suggestions: string[];
-  seo_suggestions: string[];
-  security_suggestions: string[];
+  functional_suggestions: SuggestionItem[];
+  ui_ux_suggestions: SuggestionItem[];
+  seo_suggestions: SuggestionItem[];
+  security_suggestions: SuggestionItem[];
 }
 
 export interface TestRun {

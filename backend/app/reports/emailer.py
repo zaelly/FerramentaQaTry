@@ -12,7 +12,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 from PIL import Image
 
 from app.config import SCREENSHOTS_DIR, get_smtp_settings
-from app.models import TestRun
+from app.models import STATUS_LABELS_PT, TestRun
 
 MAX_RECIPIENTS = 10
 MAX_EMBEDDED_SCREENSHOTS = 12
@@ -93,6 +93,7 @@ def build_email_content(run: TestRun, custom_message: str | None) -> tuple[str, 
     html = template.render(
         run=run,
         started_at_str=datetime.fromtimestamp(run.started_at).strftime("%d/%m/%Y %H:%M"),
+        status_label=STATUS_LABELS_PT.get(run.status, run.status),
         score_color=_score_color(run.summary.score),
         custom_message=custom_message,
         screenshot_cids=screenshot_cids,

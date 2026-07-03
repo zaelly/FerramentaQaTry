@@ -194,9 +194,10 @@ backend/
       audits.py     # auditorias de SEO, acessibilidade (axe-core), performance e segurança passiva
       vendor/       # axe-core vendorizado (motor de acessibilidade)
     reports/        # geração do relatório HTML final
+      emailer.py    # envio de relatório por e-mail (SMTP, imagens embutidas via cid)
     main.py         # API FastAPI (REST + WebSocket)
     ai_client.py    # cliente OpenAI SDK multi-provedor, com fallback automático
-    config.py       # armazenamento dos provedores configurados (data/config.json)
+    config.py       # armazenamento de provedores e SMTP (data/config.json)
   data/             # screenshots, relatórios, histórico de execuções e config.json (gerado em runtime)
 frontend/
   electron/         # processo principal do Electron (sobe o backend, abre a janela)

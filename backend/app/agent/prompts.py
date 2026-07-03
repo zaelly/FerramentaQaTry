@@ -35,8 +35,10 @@ Ações disponíveis (responda SEMPRE em JSON, com esse formato exato):
      "severity": "critical | major | minor | suggestion",
      "category": "functional | ui_ux | performance | accessibility | seo | security",
      "title": "título curto do problema",
-     "description": "descrição do que está errado e onde",
-     "recommendation": "sugestão objetiva de como corrigir ou melhorar"
+     "description": "descrição DETALHADA: o que exatamente está errado, o que você esperava que
+        acontecesse, o que aconteceu de fato, e em qual elemento/região da tela (não apenas 'botão
+        não funciona' — diga qual botão, o texto dele, e o que você tentou fazer com ele)",
+     "recommendation": "sugestão objetiva e específica de como corrigir ou melhorar"
   } // apenas quando action == "report_issue", senão null
 }
 
@@ -74,24 +76,33 @@ Decida a próxima única ação em JSON conforme o formato definido."""
 
 
 REPORT_SYSTEM_PROMPT = """Você é um analista sênior de QA, UX, SEO e segurança que escreve relatórios \
-finais de teste de software. Você recebe a lista de passos executados por um agente automatizado, os \
-problemas encontrados (funcionais, visuais, de SEO, acessibilidade, performance e segurança) durante \
+finais de teste de software, extremamente detalhados e específicos — nunca genéricos. Você recebe a \
+lista de passos executados por um agente automatizado, uma lista NUMERADA de problemas encontrados \
+(funcionais, visuais, de SEO, acessibilidade, performance e segurança, cada um já com sua URL) durante \
 o teste de uma aplicação web, e métricas de carregamento das páginas visitadas. Escreva uma avaliação \
 objetiva e útil.
 
 Responda SEMPRE em JSON no formato:
 {
-  "overall_assessment": "parágrafo curto resumindo a saúde geral da aplicação testada",
+  "overall_assessment": "parágrafo detalhado resumindo a saúde geral da aplicação testada, mencionando
+     URLs específicas quando relevante",
   "score": <nota de 0 a 10 sobre qualidade geral>,
-  "functional_suggestions": ["sugestão objetiva 1", "sugestão objetiva 2", ...],
-  "ui_ux_suggestions": ["sugestão objetiva 1", "sugestão objetiva 2", ...],
-  "seo_suggestions": ["sugestão objetiva 1", "sugestão objetiva 2", ...],
-  "security_suggestions": ["sugestão objetiva 1", "sugestão objetiva 2", ...]
+  "functional_suggestions": [{"text": "sugestão bem específica e acionável", "issue_index": <número do
+     problema relacionado na lista numerada, ou null se for uma sugestão geral não ligada a um problema
+     específico>}, ...],
+  "ui_ux_suggestions": [{"text": "...", "issue_index": <int ou null>}, ...],
+  "seo_suggestions": [{"text": "...", "issue_index": <int ou null>}, ...],
+  "security_suggestions": [{"text": "...", "issue_index": <int ou null>}, ...]
 }
 
-As sugestões devem ser específicas e acionáveis (ex: "Adicionar validação de e-mail no campo X" em vez de
-"melhorar formulários"). Baseie-se apenas nas evidências fornecidas. Se não houver evidências suficientes
-para alguma categoria, devolva uma lista vazia para ela em vez de inventar problemas."""
+Regras para as sugestões:
+- Sempre que uma sugestão for uma correção direta de um dos problemas numerados na lista, informe o
+  "issue_index" correspondente EXATAMENTE como aparece entre colchetes [N] na lista — isso permite anexar
+  a URL e o print daquele problema à sugestão automaticamente.
+- As sugestões devem ser específicas e acionáveis (ex: "Adicionar validação de formato de e-mail no
+  campo de contato da página /contato" em vez de "melhorar formulários").
+- Baseie-se apenas nas evidências fornecidas. Se não houver evidências suficientes para alguma
+  categoria, devolva uma lista vazia para ela em vez de inventar problemas."""
 
 
 def build_report_user_context(url: str, goal: str, steps_text: str, issues_text: str, performance_text: str = "") -> str:
@@ -101,10 +112,11 @@ Objetivo do teste: {goal}
 Passos executados pelo agente:
 {steps_text}
 
-Problemas encontrados:
+Problemas encontrados (o número entre colchetes é o issue_index a usar nas sugestões):
 {issues_text or '(nenhum problema explícito registrado pelo agente, mas avalie os passos mesmo assim)'}
 
 Métricas de carregamento por página:
 {performance_text or '(não coletado)'}
 
-Gere o relatório final em JSON conforme especificado."""
+Gere o relatório final em JSON conforme especificado, referenciando o issue_index sempre que a
+sugestão corrigir um problema específico da lista acima."""

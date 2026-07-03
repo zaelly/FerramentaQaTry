@@ -447,6 +447,10 @@ function SmtpSection() {
               value={passwordInput}
               onChange={(e) => setPasswordInput(e.target.value)}
             />
+            <p className="text-xs text-slate-500 mt-1.5">
+              Use a <strong>senha de app gerada pelo Google</strong> (16 caracteres), não a senha normal
+              da sua conta de e-mail — o Gmail rejeita a senha comum para SMTP de terceiros.
+            </p>
           </div>
         </div>
 

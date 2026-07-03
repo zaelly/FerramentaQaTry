@@ -4,7 +4,7 @@ from pathlib import Path
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from app.config import REPORTS_DIR
-from app.models import TestRun
+from app.models import STATUS_LABELS_PT, TestRun
 
 _env = Environment(
     loader=FileSystemLoader(str(Path(__file__).parent / "templates")),
@@ -28,6 +28,7 @@ def generate_html_report(run: TestRun) -> str:
     html = template.render(
         run=run,
         started_at_str=started_at_str,
+        status_label=STATUS_LABELS_PT.get(run.status, run.status),
         score_class=_score_class(run.summary.score),
     )
     path = REPORTS_DIR / f"{run.id}.html"

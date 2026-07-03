@@ -18,6 +18,15 @@ class RunStatus(str, Enum):
     STOPPED = "stopped"
 
 
+STATUS_LABELS_PT = {
+    RunStatus.QUEUED: "Na fila",
+    RunStatus.RUNNING: "Executando",
+    RunStatus.COMPLETED: "Concluído",
+    RunStatus.FAILED: "Falhou",
+    RunStatus.STOPPED: "Interrompido",
+}
+
+
 class IssueSeverity(str, Enum):
     CRITICAL = "critical"
     MAJOR = "major"
@@ -67,15 +76,24 @@ class Issue(BaseModel):
     step_index: Optional[int] = None
     source: str = "agent"  # agent | console | network | seo | security | accessibility | performance | sso
     timestamp: float = Field(default_factory=time.time)
+    url: Optional[str] = None  # page where the issue was found
+    path_summary: Optional[str] = None  # numbered breadcrumb of actions leading up to this issue
+
+
+class SuggestionItem(BaseModel):
+    text: str
+    url: Optional[str] = None
+    screenshot: Optional[str] = None
+    severity: Optional[IssueSeverity] = None
 
 
 class Summary(BaseModel):
     overall_assessment: str = ""
     score: Optional[int] = None
-    functional_suggestions: list[str] = Field(default_factory=list)
-    ui_ux_suggestions: list[str] = Field(default_factory=list)
-    seo_suggestions: list[str] = Field(default_factory=list)
-    security_suggestions: list[str] = Field(default_factory=list)
+    functional_suggestions: list[SuggestionItem] = Field(default_factory=list)
+    ui_ux_suggestions: list[SuggestionItem] = Field(default_factory=list)
+    seo_suggestions: list[SuggestionItem] = Field(default_factory=list)
+    security_suggestions: list[SuggestionItem] = Field(default_factory=list)
 
 
 class TestRun(BaseModel):
