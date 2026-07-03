@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="pt-br">
+<head><meta charset="utf-8" /></head>
+<body style="margin:0;padding:0;background:#f1f3f6;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+<div style="max-width:680px;margin:0 auto;padding:24px 16px;">
+
+  {% if custom_message %}
+  <div style="background:#eef2ff;border:1px solid #c7d2fe;border-radius:10px;padding:14px 18px;margin-bottom:18px;color:#3730a3;font-size:14px;">
+    {{ custom_message }}
+  </div>
+  {% endif %}
+
+  <h1 style="font-size:20px;color:#111827;margin:0 0 4px;">Relatório de Teste de QA</h1>
+  <div style="color:#6b7280;font-size:13px;margin-bottom:4px;">URL: {{ run.url }} — Objetivo: {{ run.goal }}</div>
+  <div style="color:#6b7280;font-size:13px;margin-bottom:18px;">Executado em {{ started_at_str }} · Status: {{ run.status }}</div>
+
+  <table role="presentation" width="100%" style="border-collapse:collapse;background:#ffffff;border:1px solid #e5e7eb;border-radius:10px;margin-bottom:16px;">
+    <tr>
+      <td style="padding:18px;">
+        <div style="color:#6b7280;font-size:12px;">Nota geral</div>
+        <div style="font-size:32px;font-weight:700;color:{{ score_color }};">{{ run.summary.score if run.summary.score is not none else '-' }}/10</div>
+      </td>
+      <td style="padding:18px;">
+        <div style="color:#6b7280;font-size:12px;">Resumo</div>
+        <div style="color:#111827;font-size:13px;">{{ run.summary.overall_assessment }}</div>
+      </td>
+    </tr>
+  </table>
+
+  {% for title, items in suggestion_groups %}
+  <table role="presentation" width="100%" style="border-collapse:collapse;background:#ffffff;border:1px solid #e5e7eb;border-radius:10px;margin-bottom:12px;">
+    <tr><td style="padding:16px 18px;">
+      <div style="font-weight:600;color:#111827;font-size:14px;margin-bottom:6px;">{{ title }}</div>
+      {% if items %}
+        <ul style="margin:0;padding-left:18px;color:#374151;font-size:13px;">
+          {% for s in items %}<li style="margin:3px 0;">{{ s }}</li>{% endfor %}
+        </ul>
+      {% else %}
+        <div style="color:#9ca3af;font-size:13px;">Nenhuma sugestão registrada.</div>
+      {% endif %}
+    </td></tr>
+  </table>
+  {% endfor %}
+
+  <table role="presentation" width="100%" style="border-collapse:collapse;background:#ffffff;border:1px solid #e5e7eb;border-radius:10px;margin-bottom:16px;">
+    <tr><td style="padding:16px 18px;">
+      <div style="font-weight:600;color:#111827;font-size:14px;margin-bottom:10px;">Problemas encontrados ({{ run.issues|length }})</div>
+      {% for issue in run.issues %}
+      <div style="border-left:3px solid #d1d5db;padding-left:12px;margin-bottom:16px;">
+        <span style="display:inline-block;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;text-transform:uppercase;background:#fee2e2;color:#991b1b;">{{ issue.severity }}</span>
+        <span style="display:inline-block;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;text-transform:uppercase;background:#e5e7eb;color:#374151;">{{ issue.category }}</span>
+        <div style="font-weight:600;color:#111827;font-size:13px;margin:6px 0 2px;">{{ issue.title }}</div>
+        <div style="color:#374151;font-size:13px;">{{ issue.description }}</div>
+        {% if issue.recommendation %}<div style="color:#6b7280;font-size:12px;margin-top:4px;"><strong>Recomendação:</strong> {{ issue.recommendation }}</div>{% endif %}
+        {% if issue.screenshot and issue.screenshot in screenshot_cids %}
+        <img src="cid:{{ screenshot_cids[issue.screenshot] }}" alt="evidência" style="max-width:100%;border-radius:6px;border:1px solid #e5e7eb;margin-top:8px;" />
+        {% endif %}
+      </div>
+      {% else %}
+      <div style="color:#9ca3af;font-size:13px;">Nenhum problema explícito foi registrado durante o teste.</div>
+      {% endfor %}
+    </td></tr>
+  </table>
+
+  <div style="color:#9ca3af;font-size:11px;text-align:center;margin-top:8px;">Relatório gerado automaticamente pelo QA Agent.</div>
+</div>
+</body>
+</html>

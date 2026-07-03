@@ -82,6 +82,18 @@ export interface TestRun {
   report_html_path?: string | null;
 }
 
+export interface SmtpConfig {
+  host: string;
+  port: number;
+  encryption: "starttls" | "ssl" | "none";
+  username: string;
+  password: string; // masked when coming from the API
+  has_password: boolean;
+  from_email: string;
+  from_name: string;
+  configured: boolean;
+}
+
 export interface TestRunListItem {
   id: string;
   url: string;

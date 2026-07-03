@@ -1,4 +1,4 @@
-import type { Provider, ProviderPreset, TestRun, TestRunListItem } from "./types";
+import type { Provider, ProviderPreset, SmtpConfig, TestRun, TestRunListItem } from "./types";
 
 export const API_BASE = (window as any).QA_AGENT_API_BASE || "http://127.0.0.1:8756";
 const WS_BASE = API_BASE.replace(/^http/, "ws");
@@ -41,8 +41,29 @@ export interface ProviderPatchPayload {
   enabled?: boolean;
 }
 
+export interface SmtpPatchPayload {
+  host?: string;
+  port?: number;
+  encryption?: "starttls" | "ssl" | "none";
+  username?: string;
+  password?: string;
+  from_email?: string;
+  from_name?: string;
+}
+
 export const api = {
   health: () => request<{ ok: boolean; configured: boolean }>("/api/health"),
+
+  getSmtpConfig: () => request<SmtpConfig>("/api/smtp"),
+
+  patchSmtpConfig: (payload: SmtpPatchPayload) =>
+    request<SmtpConfig>("/api/smtp", { method: "PATCH", body: JSON.stringify(payload) }),
+
+  sendReportEmail: (runId: string, recipients: string[], message?: string) =>
+    request<{ ok: boolean; error?: string }>(`/api/tests/${runId}/send-email`, {
+      method: "POST",
+      body: JSON.stringify({ recipients, message }),
+    }),
 
   listProviders: () => request<Provider[]>("/api/providers"),
 

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../lib/api";
-import type { Provider, ProviderPreset } from "../lib/types";
+import type { Provider, ProviderPreset, SmtpConfig } from "../lib/types";
 
 type PresetKey = string;
 
@@ -308,6 +308,175 @@ export function SettingsPage() {
           </div>
         </form>
       )}
+
+      <SmtpSection />
+    </div>
+  );
+}
+
+const EMPTY_SMTP: SmtpConfig = {
+  host: "",
+  port: 587,
+  encryption: "starttls",
+  username: "",
+  password: "",
+  has_password: false,
+  from_email: "",
+  from_name: "QA Agent",
+  configured: false,
+};
+
+function SmtpSection() {
+  const [smtp, setSmtp] = useState<SmtpConfig>(EMPTY_SMTP);
+  const [passwordInput, setPasswordInput] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    api
+      .getSmtpConfig()
+      .then(setSmtp)
+      .finally(() => setLoading(false));
+  }, []);
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+    setSaved(false);
+    setSaving(true);
+    try {
+      const updated = await api.patchSmtpConfig({
+        host: smtp.host.trim(),
+        port: smtp.port,
+        encryption: smtp.encryption,
+        username: smtp.username.trim(),
+        from_email: smtp.from_email.trim(),
+        from_name: smtp.from_name.trim(),
+        ...(passwordInput ? { password: passwordInput } : {}),
+      });
+      setSmtp(updated);
+      setPasswordInput("");
+      setSaved(true);
+    } catch (err: any) {
+      setError(err.message || "Não foi possível salvar as configurações de e-mail.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (loading) return null;
+
+  return (
+    <div className="mt-10">
+      <h2 className="text-xl font-semibold text-white mb-1">E-mail (envio de relatórios)</h2>
+      <p className="text-sm text-slate-400 mb-4">
+        Configure um servidor SMTP para poder enviar relatórios por e-mail (até 10 destinatários por
+        envio) direto da tela de resultados. Para Gmail, use <code>smtp.gmail.com</code>, porta 587,
+        STARTTLS, e uma{" "}
+        <a
+          href="https://myaccount.google.com/apppasswords"
+          target="_blank"
+          rel="noreferrer"
+          className="text-accent-400 underline"
+        >
+          senha de app
+        </a>{" "}
+        (não a senha normal da conta).
+      </p>
+
+      <form onSubmit={handleSave} className="card p-6 space-y-4">
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="label">Servidor SMTP</label>
+            <input
+              className="input"
+              placeholder="smtp.gmail.com"
+              value={smtp.host}
+              onChange={(e) => setSmtp({ ...smtp, host: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="label">Porta</label>
+            <input
+              className="input"
+              type="number"
+              value={smtp.port}
+              onChange={(e) => setSmtp({ ...smtp, port: Number(e.target.value) })}
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="label">Criptografia</label>
+          <div className="flex gap-2">
+            {(["starttls", "ssl", "none"] as const).map((opt) => (
+              <button
+                type="button"
+                key={opt}
+                onClick={() => setSmtp({ ...smtp, encryption: opt })}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+                  smtp.encryption === opt
+                    ? "bg-accent-500/15 border-accent-500/40 text-accent-400"
+                    : "border-base-700 text-slate-400 hover:bg-base-800"
+                }`}
+              >
+                {opt === "starttls" ? "STARTTLS (587)" : opt === "ssl" ? "SSL/TLS (465)" : "Nenhuma"}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="label">Usuário</label>
+            <input
+              className="input"
+              placeholder="seu@gmail.com"
+              value={smtp.username}
+              onChange={(e) => setSmtp({ ...smtp, username: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="label">Senha</label>
+            <input
+              className="input"
+              type="password"
+              placeholder={smtp.has_password ? "Deixe em branco para manter a atual" : "senha de app"}
+              value={passwordInput}
+              onChange={(e) => setPasswordInput(e.target.value)}
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="label">E-mail remetente</label>
+            <input
+              className="input"
+              placeholder="seu@gmail.com"
+              value={smtp.from_email}
+              onChange={(e) => setSmtp({ ...smtp, from_email: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="label">Nome do remetente</label>
+            <input
+              className="input"
+              value={smtp.from_name}
+              onChange={(e) => setSmtp({ ...smtp, from_name: e.target.value })}
+            />
+          </div>
+        </div>
+
+        {error && <div className="text-sm text-red-400">{error}</div>}
+        {saved && <div className="text-sm text-emerald-400">Configurações de e-mail salvas.</div>}
+
+        <button type="submit" className="btn-primary" disabled={saving}>
+          {saving ? "Salvando..." : "Salvar configurações de e-mail"}
+        </button>
+      </form>
     </div>
   );
 }

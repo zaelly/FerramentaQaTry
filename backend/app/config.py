@@ -134,3 +134,33 @@ def reorder_providers(order: list[str]) -> list[dict]:
 
 def is_configured() -> bool:
     return any(p.get("enabled", True) for p in get_providers())
+
+
+DEFAULT_SMTP = {
+    "host": "",
+    "port": 587,
+    "encryption": "starttls",  # starttls | ssl | none
+    "username": "",
+    "password": "",
+    "from_email": "",
+    "from_name": "QA Agent",
+}
+
+
+def get_smtp_settings() -> dict:
+    data = _read_config_file()
+    return {**DEFAULT_SMTP, **data.get("smtp", {})}
+
+
+def save_smtp_settings(patch: dict) -> dict:
+    data = _read_config_file()
+    current = {**DEFAULT_SMTP, **data.get("smtp", {})}
+    current.update(patch)
+    data["smtp"] = current
+    _write_config_file(data)
+    return current
+
+
+def is_smtp_configured() -> bool:
+    smtp = get_smtp_settings()
+    return bool(smtp.get("host") and smtp.get("from_email"))

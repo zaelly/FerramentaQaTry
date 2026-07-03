@@ -75,6 +75,24 @@ Se sua GPU NVIDIA for mais antiga/com pouca VRAM e o Ollama travar com um erro d
 `%LOCALAPPDATA%\Ollama\server.log`, force o modo CPU definindo a variável de ambiente do Windows
 `OLLAMA_LLM_LIBRARY=cpu` (Configurações do Windows → Variáveis de Ambiente) e reinicie o Ollama.
 
+## Enviar relatórios por e-mail
+
+Na tela **Configurações**, na seção "E-mail (envio de relatórios)", configure um servidor SMTP:
+
+- **Gmail**: servidor `smtp.gmail.com`, porta 587, criptografia STARTTLS, e uma
+  [senha de app](https://myaccount.google.com/apppasswords) (não a senha normal da conta — o Gmail
+  não aceita mais senha normal para SMTP de terceiros).
+- **Outlook/Office 365**: servidor `smtp.office365.com`, porta 587, STARTTLS.
+- Qualquer outro provedor SMTP (SendGrid, Amazon SES, servidor da própria empresa, etc.) também
+  funciona — basta preencher host, porta, usuário e senha corretos.
+
+Depois de configurado, abra qualquer relatório concluído (aba **Relatório** na tela de execução) e
+clique em **"Enviar por e-mail"**. Informe até 10 destinatários (separados por vírgula ou um por
+linha) e, opcionalmente, uma mensagem — o mesmo relatório (com nota, sugestões por categoria,
+problemas encontrados e capturas de tela) é enviado para todos de uma vez. As imagens vão embutidas
+diretamente no e-mail (não como link), então aparecem mesmo se o destinatário não tiver acesso à
+sua máquina.
+
 ## Pré-requisitos
 
 1. **Python 3.10+** — instale em https://www.python.org/downloads/ (marque "Add python.exe to
