@@ -75,6 +75,12 @@ Se sua GPU NVIDIA for mais antiga/com pouca VRAM e o Ollama travar com um erro d
 `%LOCALAPPDATA%\Ollama\server.log`, force o modo CPU definindo a variável de ambiente do Windows
 `OLLAMA_LLM_LIBRARY=cpu` (Configurações do Windows → Variáveis de Ambiente) e reinicie o Ollama.
 
+Se aparecer um erro tipo `"request (N tokens) exceeds the available context size (4096 tokens)"`,
+é porque o Ollama usa por padrão uma janela de contexto pequena (4096), e o agente manda imagem +
+lista de elementos + histórico, que pode passar disso em páginas mais complexas. Aumente definindo
+a variável de ambiente do Windows `OLLAMA_CONTEXT_LENGTH=8192` (ou mais, se tiver RAM sobrando) e
+reinicie o Ollama.
+
 ## Enviar relatórios por e-mail
 
 Na tela **Configurações**, na seção "E-mail (envio de relatórios)", configure um servidor SMTP:

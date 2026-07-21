@@ -28,11 +28,6 @@ from app.storage import store
 MAX_CONSECUTIVE_FAILURES = 5
 MAX_CONSECUTIVE_DECISION_ERRORS = 4
 
-# Don't take more than one "event" screenshot (console/network errors) within
-# this window — a single broken page load can fire a dozen failed requests at
-# once, and we don't need a near-identical screenshot for each of them.
-EVENT_SCREENSHOT_MIN_INTERVAL = 1.5
-
 # Smaller/local models don't always follow the exact action vocabulary given
 # in the prompt (observed e.g. qwen2.5vl:7b via Ollama returning "clique"
 # instead of "click", following the language of the rest of the prompt
@@ -202,7 +197,7 @@ def _to_suggestion_items(raw_list, issues: list[Issue]) -> list[SuggestionItem]:
     return items
 
 
-async def _maybe_audit_page(page, run: TestRun, audited_urls: set) -> None:
+async def _maybe_audit_page(page, run: TestRun, audited_urls: set, get_screenshot) -> None:
     """Runs the SEO/accessibility/performance/security audits the first time
     the agent lands on a given URL. Cheap no-op on repeat visits."""
     url = page.url
@@ -219,11 +214,7 @@ async def _maybe_audit_page(page, run: TestRun, audited_urls: set) -> None:
         run.performance_metrics[url] = metrics
 
     if issues:
-        try:
-            raw_screenshot = await page.screenshot(full_page=False)
-            filename = _save_screenshot(run.id, f"audit-{uuid.uuid4().hex[:8]}", raw_screenshot)
-        except Exception:
-            filename = None
+        filename = await get_screenshot(url)
         path = _path_summary(run.steps, url)
         for issue in issues:
             issue.screenshot = filename
@@ -249,8 +240,8 @@ async def run_test(run: TestRun, username: str | None, password: str | None) -> 
     store.update(run)
     await _publish(run, {"type": "status", "status": "running"})
 
-    consecutive_failures = 0
-    event_screenshot_state = {"filename": None, "time": 0.0}
+    page_screenshots: dict[str, str] = {}
+    cancelled = False
 
     try:
         async with async_playwright() as p:
@@ -258,21 +249,24 @@ async def run_test(run: TestRun, username: str | None, password: str | None) -> 
             context = await browser.new_context(viewport={"width": 1366, "height": 900})
             page = await context.new_page()
 
-            async def event_screenshot() -> str | None:
-                now = time.time()
-                if event_screenshot_state["filename"] and now - event_screenshot_state["time"] < EVENT_SCREENSHOT_MIN_INTERVAL:
-                    return event_screenshot_state["filename"]
+            async def get_page_screenshot(url: str | None = None) -> str | None:
+                """One screenshot per unique URL — every issue found on the
+                same page (console errors, network failures, audits, agent
+                reports) reuses the same image instead of a fresh one each."""
+                target_url = url or page.url
+                cached = page_screenshots.get(target_url)
+                if cached:
+                    return cached
                 try:
                     raw = await page.screenshot(full_page=False)
                 except Exception:
-                    return event_screenshot_state["filename"]
-                filename = _save_screenshot(run.id, f"evt-{uuid.uuid4().hex[:8]}", raw)
-                event_screenshot_state["filename"] = filename
-                event_screenshot_state["time"] = now
+                    return None
+                filename = _save_screenshot(run.id, f"page-{uuid.uuid4().hex[:8]}", raw)
+                page_screenshots[target_url] = filename
                 return filename
 
             async def record_runtime_issue(severity, category, title, description, source):
-                filename = await event_screenshot()
+                filename = await get_page_screenshot()
                 issue = Issue(
                     severity=severity,
                     category=category,
@@ -327,131 +321,144 @@ async def run_test(run: TestRun, username: str | None, password: str | None) -> 
             page.on("pageerror", on_page_error)
             page.on("response", on_response)
 
-            await page.goto(run.url, wait_until="domcontentloaded", timeout=30000)
-            await page.wait_for_timeout(800)
-
-            audited_urls: set = set()
-            await _maybe_audit_page(page, run, audited_urls)
-
-            step_index = 0
-            consecutive_decision_errors = 0
-            while step_index < run.max_steps:
-                await _maybe_audit_page(page, run, audited_urls)
-                elements = await extract_interactive_elements(page)
-                raw_screenshot = await page.screenshot(full_page=False)
-                marked_screenshot = draw_marks_on_screenshot(raw_screenshot, elements)
-                filename = _save_screenshot(run.id, str(step_index), marked_screenshot)
-                model_screenshot = resize_for_model(marked_screenshot)
-
-                user_text = build_user_context(
-                    goal=run.goal,
-                    url=page.url,
-                    has_credentials=bool(username and password),
-                    history_text=_history_text(run.steps),
-                    elements_text=elements_to_text(elements),
-                )
-                if username and password:
-                    user_text += f"\n\nCredenciais de teste: usuário='{username}' senha='{password}'"
-
-                try:
-                    decision, provider_used = await asyncio.to_thread(
-                        ask_vision, AGENT_SYSTEM_PROMPT, user_text, model_screenshot
-                    )
-                    consecutive_decision_errors = 0
-                except Exception as exc:  # noqa: BLE001
-                    consecutive_decision_errors += 1
-                    step = Step(index=step_index, action="decision_error", ok=False, error=str(exc), screenshot=filename)
-                    run.steps.append(step)
-                    store.update(run)
-                    await _publish(run, {"type": "step", "step": step.model_dump()})
-                    if consecutive_decision_errors >= MAX_CONSECUTIVE_DECISION_ERRORS:
-                        run.error = "Interrompido após várias falhas consecutivas ao consultar a IA."
-                        break
-                    step_index += 1
-                    await page.wait_for_timeout(1500)
-                    continue
-
-                action = _normalize_action(decision.get("action", "wait"))
-                mark_id = decision.get("mark_id")
-                value = decision.get("value")
-                thought = decision.get("thought")
-
-                if action == "report_issue" and decision.get("issue"):
-                    issue_data = decision["issue"]
-                    issue = Issue(
-                        severity=_safe_severity(issue_data.get("severity", "minor")),
-                        category=_safe_category(issue_data.get("category", "functional")),
-                        title=issue_data.get("title", "Problema identificado"),
-                        description=issue_data.get("description", ""),
-                        recommendation=issue_data.get("recommendation"),
-                        screenshot=filename,
-                        step_index=step_index,
-                        source="agent",
-                        url=page.url,
-                        path_summary=_path_summary(run.steps, page.url),
-                    )
-                    run.issues.append(issue)
-                    step = Step(
-                        index=step_index,
-                        action="report_issue",
-                        thought=thought,
-                        screenshot=filename,
-                        ok=True,
-                        provider=provider_used,
-                    )
-                    run.steps.append(step)
-                    store.update(run)
-                    await _publish(run, {"type": "issue", "issue": issue.model_dump()})
-                    await _publish(run, {"type": "step", "step": step.model_dump()})
-                    step_index += 1
-                    continue
-
-                if action == "finish":
-                    step = Step(
-                        index=step_index, action="finish", thought=thought, screenshot=filename, ok=True, provider=provider_used
-                    )
-                    run.steps.append(step)
-                    store.update(run)
-                    await _publish(run, {"type": "step", "step": step.model_dump()})
-                    break
-
-                result = await execute_action(page, action, mark_id, value, elements)
-                step = Step(
-                    index=step_index,
-                    action=action,
-                    target=str(mark_id) if mark_id is not None else None,
-                    value=value,
-                    thought=thought,
-                    screenshot=filename,
-                    ok=result.ok,
-                    error=result.error,
-                    provider=provider_used,
-                )
-                run.steps.append(step)
-                store.update(run)
-                await _publish(run, {"type": "step", "step": step.model_dump()})
-
-                consecutive_failures = 0 if result.ok else consecutive_failures + 1
-                if consecutive_failures >= MAX_CONSECUTIVE_FAILURES:
-                    run.error = "Interrompido após várias falhas consecutivas de ação."
-                    break
-
-                await page.wait_for_timeout(600)
-                step_index += 1
-
-            await context.close()
-            await browser.close()
+            try:
+                await _run_agent_loop(run, page, get_page_screenshot, username, password)
+            finally:
+                await context.close()
+                await browser.close()
 
         await _build_final_report(run)
         run.status = RunStatus.FAILED if run.error else RunStatus.COMPLETED
 
+    except asyncio.CancelledError:
+        cancelled = True
     except Exception as exc:  # noqa: BLE001
         run.status = RunStatus.FAILED
         run.error = f"{exc}\n{traceback.format_exc(limit=3)}"
 
+    if cancelled:
+        await _build_final_report(run)
+        run.status = RunStatus.STOPPED
+
     run.finished_at = time.time()
     store.update(run)
     await _publish(run, {"type": "finished", "status": run.status})
+
+
+async def _run_agent_loop(run: TestRun, page, get_page_screenshot, username: str | None, password: str | None) -> None:
+    consecutive_failures = 0
+
+    await page.goto(run.url, wait_until="domcontentloaded", timeout=30000)
+    await page.wait_for_timeout(800)
+
+    audited_urls: set = set()
+    await _maybe_audit_page(page, run, audited_urls, get_page_screenshot)
+
+    step_index = 0
+    consecutive_decision_errors = 0
+    while step_index < run.max_steps:
+        await _maybe_audit_page(page, run, audited_urls, get_page_screenshot)
+        elements = await extract_interactive_elements(page)
+        raw_screenshot = await page.screenshot(full_page=False)
+        marked_screenshot = draw_marks_on_screenshot(raw_screenshot, elements)
+        filename = _save_screenshot(run.id, str(step_index), marked_screenshot)
+        model_screenshot = resize_for_model(marked_screenshot)
+
+        user_text = build_user_context(
+            goal=run.goal,
+            url=page.url,
+            has_credentials=bool(username and password),
+            history_text=_history_text(run.steps),
+            elements_text=elements_to_text(elements),
+        )
+        if username and password:
+            user_text += f"\n\nCredenciais de teste: usuário='{username}' senha='{password}'"
+
+        try:
+            decision, provider_used = await asyncio.to_thread(
+                ask_vision, AGENT_SYSTEM_PROMPT, user_text, model_screenshot
+            )
+            consecutive_decision_errors = 0
+        except Exception as exc:  # noqa: BLE001
+            consecutive_decision_errors += 1
+            step = Step(index=step_index, action="decision_error", ok=False, error=str(exc), screenshot=filename)
+            run.steps.append(step)
+            store.update(run)
+            await _publish(run, {"type": "step", "step": step.model_dump()})
+            if consecutive_decision_errors >= MAX_CONSECUTIVE_DECISION_ERRORS:
+                run.error = "Interrompido após várias falhas consecutivas ao consultar a IA."
+                break
+            step_index += 1
+            await page.wait_for_timeout(1500)
+            continue
+
+        action = _normalize_action(decision.get("action", "wait"))
+        mark_id = decision.get("mark_id")
+        value = decision.get("value")
+        thought = decision.get("thought")
+
+        if action == "report_issue" and decision.get("issue"):
+            issue_data = decision["issue"]
+            issue = Issue(
+                severity=_safe_severity(issue_data.get("severity", "minor")),
+                category=_safe_category(issue_data.get("category", "functional")),
+                title=issue_data.get("title", "Problema identificado"),
+                description=issue_data.get("description", ""),
+                recommendation=issue_data.get("recommendation"),
+                screenshot=await get_page_screenshot(page.url),
+                step_index=step_index,
+                source="agent",
+                url=page.url,
+                path_summary=_path_summary(run.steps, page.url),
+            )
+            run.issues.append(issue)
+            step = Step(
+                index=step_index,
+                action="report_issue",
+                thought=thought,
+                screenshot=filename,
+                ok=True,
+                provider=provider_used,
+            )
+            run.steps.append(step)
+            store.update(run)
+            await _publish(run, {"type": "issue", "issue": issue.model_dump()})
+            await _publish(run, {"type": "step", "step": step.model_dump()})
+            step_index += 1
+            continue
+
+        if action == "finish":
+            step = Step(
+                index=step_index, action="finish", thought=thought, screenshot=filename, ok=True, provider=provider_used
+            )
+            run.steps.append(step)
+            store.update(run)
+            await _publish(run, {"type": "step", "step": step.model_dump()})
+            break
+
+        result = await execute_action(page, action, mark_id, value, elements)
+        step = Step(
+            index=step_index,
+            action=action,
+            target=str(mark_id) if mark_id is not None else None,
+            value=value,
+            thought=thought,
+            screenshot=filename,
+            ok=result.ok,
+            error=result.error,
+            provider=provider_used,
+        )
+        run.steps.append(step)
+        store.update(run)
+        await _publish(run, {"type": "step", "step": step.model_dump()})
+
+        consecutive_failures = 0 if result.ok else consecutive_failures + 1
+        if consecutive_failures >= MAX_CONSECUTIVE_FAILURES:
+            run.error = "Interrompido após várias falhas consecutivas de ação."
+            break
+
+        await page.wait_for_timeout(600)
+        step_index += 1
 
 
 async def _build_final_report(run: TestRun) -> None:

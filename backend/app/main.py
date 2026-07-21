@@ -36,6 +36,8 @@ app.mount("/files", StaticFiles(directory=str(DATA_DIR)), name="files")
 
 store.load_from_disk()
 
+_running_tasks: dict[str, asyncio.Task] = {}
+
 
 @app.get("/api/health")
 async def health():
@@ -117,7 +119,9 @@ async def start_test(payload: TestRequest):
         status=RunStatus.QUEUED,
     )
     store.create(run)
-    asyncio.create_task(run_test(run, payload.username, payload.password))
+    task = asyncio.create_task(run_test(run, payload.username, payload.password))
+    _running_tasks[run.id] = task
+    task.add_done_callback(lambda _t, run_id=run.id: _running_tasks.pop(run_id, None))
     return {"run_id": run.id}
 
 
@@ -144,6 +148,18 @@ async def get_test(run_id: str):
     if not run:
         return {"error": "not_found"}
     return run.model_dump()
+
+
+@app.post("/api/tests/{run_id}/cancel")
+async def cancel_test(run_id: str):
+    run = store.get(run_id)
+    if not run:
+        return {"ok": False, "error": "Teste não encontrado."}
+    task = _running_tasks.get(run_id)
+    if not task or task.done():
+        return {"ok": False, "error": "Este teste não está em execução."}
+    task.cancel()
+    return {"ok": True}
 
 
 class SmtpPatchPayload(BaseModel):

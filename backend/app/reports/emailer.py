@@ -13,6 +13,7 @@ from PIL import Image
 
 from app.config import SCREENSHOTS_DIR, get_smtp_settings
 from app.models import STATUS_LABELS_PT, TestRun
+from app.reports.generator import group_issues_by_url
 
 MAX_RECIPIENTS = 10
 MAX_EMBEDDED_SCREENSHOTS = 12
@@ -97,6 +98,7 @@ def build_email_content(run: TestRun, custom_message: str | None) -> tuple[str, 
         score_color=_score_color(run.summary.score),
         custom_message=custom_message,
         screenshot_cids=screenshot_cids,
+        issue_groups=group_issues_by_url(run.issues),
         suggestion_groups=[
             ("Sugestões funcionais", run.summary.functional_suggestions),
             ("Sugestões de UI/UX", run.summary.ui_ux_suggestions),

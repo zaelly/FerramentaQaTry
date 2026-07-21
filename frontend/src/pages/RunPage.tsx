@@ -9,6 +9,7 @@ export function RunPage() {
   const [run, setRun] = useState<TestRun | null>(null);
   const [status, setStatus] = useState<RunStatus>("queued");
   const [activeTab, setActiveTab] = useState<"timeline" | "issues" | "report">("timeline");
+  const [canceling, setCanceling] = useState(false);
   const stepsEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -58,6 +59,18 @@ export function RunPage() {
   const lastScreenshot = [...run.steps].reverse().find((s) => s.screenshot)?.screenshot;
   const isLive = status === "running" || status === "queued";
 
+  async function handleCancel() {
+    if (!id || canceling) return;
+    setCanceling(true);
+    try {
+      await api.cancelTest(id);
+    } catch {
+      // status will settle via the websocket stream regardless
+    } finally {
+      setCanceling(false);
+    }
+  }
+
   return (
     <div className="max-w-6xl mx-auto px-8 py-8">
       <div className="flex items-start justify-between mb-6">
@@ -68,12 +81,23 @@ export function RunPage() {
           </div>
           <p className="text-sm text-slate-400 mt-1 max-w-xl">{run.goal}</p>
         </div>
-        {run.summary?.score != null && (
-          <div className="text-right">
-            <div className="text-3xl font-bold text-white">{run.summary.score}/10</div>
-            <div className="text-xs text-slate-500">nota geral</div>
-          </div>
-        )}
+        <div className="flex items-center gap-4">
+          {isLive && (
+            <button
+              onClick={handleCancel}
+              disabled={canceling}
+              className="btn-secondary text-sm text-red-400 border-red-500/30 hover:bg-red-500/10 disabled:opacity-50"
+            >
+              {canceling ? "Cancelando..." : "Cancelar teste"}
+            </button>
+          )}
+          {run.summary?.score != null && (
+            <div className="text-right">
+              <div className="text-3xl font-bold text-white">{run.summary.score}/10</div>
+              <div className="text-xs text-slate-500">nota geral</div>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-5 gap-6">
@@ -130,8 +154,8 @@ export function RunPage() {
                   Nenhum problema encontrado até agora.
                 </div>
               )}
-              {run.issues.map((issue) => (
-                <IssueCard key={issue.id} issue={issue} />
+              {groupIssuesByUrl(run.issues).map((group) => (
+                <IssueGroupCard key={group.url || "sem-url"} group={group} />
               ))}
             </div>
           )}
@@ -354,38 +378,69 @@ function StepRow({ step }: { step: Step }) {
   );
 }
 
-function IssueCard({ issue }: { issue: Issue }) {
+interface IssueGroup {
+  url: string | null | undefined;
+  screenshot: string | null | undefined;
+  issues: Issue[];
+}
+
+function groupIssuesByUrl(issues: Issue[]): IssueGroup[] {
+  const groups: IssueGroup[] = [];
+  const byUrl = new Map<string, IssueGroup>();
+  for (const issue of issues) {
+    const key = issue.url || "";
+    let group = byUrl.get(key);
+    if (!group) {
+      group = { url: issue.url, screenshot: issue.screenshot, issues: [] };
+      byUrl.set(key, group);
+      groups.push(group);
+    }
+    if (!group.screenshot && issue.screenshot) {
+      group.screenshot = issue.screenshot;
+    }
+    group.issues.push(issue);
+  }
+  return groups;
+}
+
+function IssueGroupCard({ group }: { group: IssueGroup }) {
   return (
     <div className="card p-4">
-      <div className="flex items-center gap-2 mb-2">
-        <SeverityBadge severity={issue.severity} />
-        <CategoryBadge category={issue.category} />
-      </div>
-      <h4 className="text-white font-medium">{issue.title}</h4>
-      {issue.url && (
-        <div className="text-xs text-slate-500 mt-1 truncate" title={issue.url}>
-          URL: {issue.url}
+      {group.url && (
+        <div className="text-xs text-slate-500 mb-2 truncate" title={group.url}>
+          URL: {group.url}
         </div>
       )}
-      <p className="text-sm text-slate-400 mt-2">{issue.description}</p>
-      {issue.recommendation && (
-        <p className="text-sm text-emerald-400/90 mt-2">
-          <span className="font-medium">Sugestão: </span>
-          {issue.recommendation}
-        </p>
-      )}
-      {issue.path_summary && (
-        <pre className="text-xs text-slate-500 mt-3 bg-base-900 border border-base-700 rounded-lg p-3 whitespace-pre-wrap font-mono">
-          {issue.path_summary}
-        </pre>
-      )}
-      {issue.screenshot && (
+      {group.screenshot && (
         <img
-          src={api.screenshotUrl(issue.screenshot)}
-          className="mt-3 rounded-lg border border-base-700 max-w-md"
-          alt="evidência do problema"
+          src={api.screenshotUrl(group.screenshot)}
+          className="mb-3 rounded-lg border border-base-700 max-w-md"
+          alt="evidência dos problemas"
         />
       )}
+      <div className="space-y-4 divide-y divide-base-700">
+        {group.issues.map((issue) => (
+          <div key={issue.id} className={issue === group.issues[0] ? "" : "pt-4"}>
+            <div className="flex items-center gap-2 mb-2">
+              <SeverityBadge severity={issue.severity} />
+              <CategoryBadge category={issue.category} />
+            </div>
+            <h4 className="text-white font-medium">{issue.title}</h4>
+            <p className="text-sm text-slate-400 mt-2">{issue.description}</p>
+            {issue.recommendation && (
+              <p className="text-sm text-emerald-400/90 mt-2">
+                <span className="font-medium">Sugestão: </span>
+                {issue.recommendation}
+              </p>
+            )}
+            {issue.path_summary && (
+              <pre className="text-xs text-slate-500 mt-3 bg-base-900 border border-base-700 rounded-lg p-3 whitespace-pre-wrap font-mono">
+                {issue.path_summary}
+              </pre>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

@@ -87,6 +87,9 @@ export const api = {
 
   getTest: (id: string) => request<TestRun>(`/api/tests/${id}`),
 
+  cancelTest: (id: string) =>
+    request<{ ok: boolean; error?: string }>(`/api/tests/${id}/cancel`, { method: "POST" }),
+
   screenshotUrl: (filename: string) => `${API_BASE}/files/screenshots/${filename}`,
 
   reportUrl: (filename: string) => `${API_BASE}/files/reports/${filename}`,

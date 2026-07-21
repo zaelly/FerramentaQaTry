@@ -21,8 +21,10 @@
   .badge.major { background: #7c2d12; color: #fdba74; }
   .badge.minor { background: #713f12; color: #fde68a; }
   .badge.suggestion { background: #1e3a5f; color: #93c5fd; }
-  .issue { border-left: 3px solid #334; padding-left: 16px; margin-bottom: 22px; }
-  .issue img { max-width: 100%; border-radius: 8px; border: 1px solid #232838; margin-top: 10px; }
+  .issue-group { margin-bottom: 26px; padding-bottom: 20px; border-bottom: 1px solid #232838; }
+  .issue-group:last-child { border-bottom: none; }
+  .issue-group img { max-width: 100%; border-radius: 8px; border: 1px solid #232838; margin: 8px 0 16px; }
+  .issue { border-left: 3px solid #334; padding-left: 16px; margin-bottom: 14px; }
   .step-line { font-family: ui-monospace, Consolas, monospace; font-size: 12.5px; color: #b7c0cf; padding: 3px 0; border-bottom: 1px dashed #232838; }
   .step-line.err { color: #f87171; }
   .path-summary { font-family: ui-monospace, Consolas, monospace; font-size: 12px; color: #9aa4b2; background: #0d1017; border-radius: 8px; padding: 10px 12px; margin-top: 8px; white-space: pre-line; }
@@ -87,16 +89,20 @@
 
   <div class="card">
     <h3>Problemas encontrados ({{ run.issues|length }})</h3>
-    {% for issue in run.issues %}
-    <div class="issue">
-      <span class="badge {{ issue.severity }}">{{ issue.severity }}</span>
-      <span class="badge {{ issue.category }}" style="background:#1f2937;color:#cbd5e1;">{{ issue.category }}</span>
-      <h4 style="margin:8px 0 2px;">{{ issue.title }}</h4>
-      {% if issue.url %}<div class="issue-url muted">URL: <a href="{{ issue.url }}">{{ issue.url }}</a></div>{% endif %}
-      <div style="margin-top:6px;">{{ issue.description }}</div>
-      {% if issue.recommendation %}<div class="muted" style="margin-top:6px;"><strong>Recomendação:</strong> {{ issue.recommendation }}</div>{% endif %}
-      {% if issue.path_summary %}<div class="path-summary">{{ issue.path_summary }}</div>{% endif %}
-      {% if issue.screenshot %}<img src="../screenshots/{{ issue.screenshot }}" alt="evidência" />{% endif %}
+    {% for group in issue_groups %}
+    <div class="issue-group">
+      {% if group.url %}<div class="issue-url muted">URL: <a href="{{ group.url }}">{{ group.url }}</a></div>{% endif %}
+      {% if group.screenshot %}<img src="../screenshots/{{ group.screenshot }}" alt="evidência" />{% endif %}
+      {% for issue in group.issues %}
+      <div class="issue">
+        <span class="badge {{ issue.severity }}">{{ issue.severity }}</span>
+        <span class="badge {{ issue.category }}" style="background:#1f2937;color:#cbd5e1;">{{ issue.category }}</span>
+        <h4 style="margin:8px 0 2px;">{{ issue.title }}</h4>
+        <div style="margin-top:6px;">{{ issue.description }}</div>
+        {% if issue.recommendation %}<div class="muted" style="margin-top:6px;"><strong>Recomendação:</strong> {{ issue.recommendation }}</div>{% endif %}
+        {% if issue.path_summary %}<div class="path-summary">{{ issue.path_summary }}</div>{% endif %}
+      </div>
+      {% endfor %}
     </div>
     {% else %}
     <div class="muted">Nenhum problema explícito foi registrado durante o teste.</div>
